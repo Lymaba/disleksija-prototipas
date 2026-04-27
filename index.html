@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Disleksijos intervencijos prototipas</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --card: #ffffff;
+    --border: #e3e3df;
+    --text: #1d1d1b;
+    --muted: #6b6b66;
+    --accent: #2f5fa3;
+    --accent-soft: #e8eff9;
+    --correct: #2a8c3a;
+    --wrong: #cc4433;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 32px 16px 64px;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  header.intro {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  header.intro h1 {
+    font-size: 28px;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  header.intro p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  nav.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  nav.tabs button {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  nav.tabs button:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+  nav.tabs button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+  .task {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  }
+  .task[hidden] { display: none; }
+  .task h2 {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  .task .desc {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 20px;
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .controls label {
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .controls input[type=range] {
+    flex: 1;
+    min-width: 160px;
+  }
+  .controls .ms {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    min-width: 64px;
+    text-align: right;
+  }
+  .stage {
+    background: #fafaf8;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    min-height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    padding: 28px 16px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  .stimulus {
+    font-size: 42px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    min-height: 56px;
+    line-height: 1.1;
+  }
+  .hint {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .answer-input {
+    font-family: inherit;
+    font-size: 22px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: min(360px, 100%);
+    text-align: center;
+    background: white;
+  }
+  .answer-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .choices {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .choice {
+    font-family: inherit;
+    font-size: 22px;
+    padding: 14px 28px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    min-width: 160px;
+    transition: background 0.15s, border-color 0.15s, transform 0.05s;
+  }
+  .choice:hover:not(:disabled) {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+  .choice:active:not(:disabled) { transform: translateY(1px); }
+  .choice.correct {
+    background: #e7f5e9;
+    border-color: var(--correct);
+    color: var(--correct);
+  }
+  .choice.wrong {
+    background: #fbe9e7;
+    border-color: var(--wrong);
+    color: var(--wrong);
+  }
+  .btn {
+    font-family: inherit;
+    font-size: 16px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: white;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .btn:hover { background: #264e87; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn.secondary {
+    background: white;
+    color: var(--accent);
+  }
+  .btn.secondary:hover { background: var(--accent-soft); }
+  .feedback {
+    min-height: 28px;
+    font-size: 16px;
+    font-weight: 500;
+  }
+  .feedback.correct { color: var(--correct); }
+  .feedback.wrong { color: var(--wrong); }
+  .meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .progress {
+    width: 100%;
+    height: 8px;
+    background: #ececea;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .progress > div {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.25s;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .done {
+    text-align: center;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .done strong { color: var(--text); font-size: 17px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="intro">
+    <h1>Disleksijos intervencijos prototipas</h1>
+    <p>Pagal Vender &amp; Delfitto (2025) — adaptuota lietuvių kalbai</p>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="rapid" class="active">1. Greitas skaitymas</button>
+    <button data-tab="pick">2. Teisingas žodis</button>
+    <button data-tab="listen">3. Klausyk ir pasirink</button>
+    <button data-tab="dictation">4. Diktantas</button>
+    <button data-tab="lexical">5. Leksinis sprendimas</button>
+  </nav>
+
+  <!-- TASK 1: RAPID READING -->
+  <section class="task" id="task-rapid">
+    <h2>Greitas skaitymas</h2>
+    <p class="desc">Žodis pasirodys trumpam ekrane. Įsidėmėk jį ir įrašyk, ką pamatei.</p>
+
+    <div class="controls">
+      <label for="rapid-ms">Žodžio trukmė:</label>
+      <input id="rapid-ms" type="range" min="100" max="1500" step="50" value="600">
+      <span class="ms" id="rapid-ms-val">600 ms</span>
+    </div>
+
+    <div class="stage">
+      <div class="stimulus" id="rapid-stim">—</div>
+      <input class="answer-input" id="rapid-input" type="text" placeholder="Įrašyk žodį ir paspausk Enter" hidden autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="feedback" id="rapid-feedback"></div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="rapid-start">Pradėti</button>
+      <button class="btn secondary" id="rapid-reset">Iš naujo</button>
+    </div>
+
+    <div class="meta">
+      <span>Rezultatas: <strong id="rapid-score">0 / 0</strong></span>
+      <span id="rapid-progress-text">0 / 0</span>
+    </div>
+    <div class="progress"><div id="rapid-progress"></div></div>
+  </section>
+
+  <!-- TASK 2: PICK CORRECT -->
+  <section class="task" id="task-pick" hidden>
+    <h2>Teisingas žodis</h2>
+    <p class="desc">Pasirink teisingai parašytą žodį.</p>
+
+    <div class="stage">
+      <div class="choices" id="pick-choices"></div>
+      <div class="feedback" id="pick-feedback"></div>
+    </div>
+
+    <div class="row">
+      <button class="btn secondary" id="pick-reset">Iš naujo</button>
+    </div>
+
+    <div class="meta">
+      <span>Rezultatas: <strong id="pick-score">0 / 0</strong></span>
+      <span id="pick-progress-text">0 / 0</span>
+    </div>
+    <div class="progress"><div id="pick-progress"></div></div>
+  </section>
+
+  <!-- TASK 3: LISTEN AND CHOOSE -->
+  <section class="task" id="task-listen" hidden>
+    <h2>Klausyk ir pasirink</h2>
+    <p class="desc">Paspausk „Klausyti" ir pasirink, kurį žodį girdėjai.</p>
+
+    <div class="stage">
+      <button class="btn" id="listen-play">🔊 Klausyti</button>
+      <div class="choices" id="listen-choices"></div>
+      <div class="feedback" id="listen-feedback"></div>
+    </div>
+
+    <div class="row">
+      <button class="btn secondary" id="listen-reset">Iš naujo</button>
+    </div>
+
+    <div class="meta">
+      <span>Rezultatas: <strong id="listen-score">0 / 0</strong></span>
+      <span id="listen-progress-text">0 / 0</span>
+    </div>
+    <div class="progress"><div id="listen-progress"></div></div>
+  </section>
+
+  <!-- TASK 4: DICTATION -->
+  <section class="task" id="task-dictation" hidden>
+    <h2>Diktantas</h2>
+    <p class="desc">Paklausyk žodžio ir įrašyk jį teisingai.</p>
+
+    <div class="stage">
+      <button class="btn secondary" id="dict-replay">🔊 Pakartoti</button>
+      <input class="answer-input" id="dict-input" type="text" placeholder="Įrašyk girdėtą žodį" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="feedback" id="dict-feedback"></div>
+    </div>
+
+    <div class="row">
+      <button class="btn secondary" id="dict-reset">Iš naujo</button>
+    </div>
+
+    <div class="meta">
+      <span>Rezultatas: <strong id="dict-score">0 / 0</strong></span>
+      <span id="dict-progress-text">0 / 0</span>
+    </div>
+    <div class="progress"><div id="dict-progress"></div></div>
+  </section>
+
+  <!-- TASK 5: LEXICAL DECISION -->
+  <section class="task" id="task-lexical" hidden>
+    <h2>Leksinis sprendimas</h2>
+    <p class="desc">Pasirink tikrą lietuvišką žodį.</p>
+
+    <div class="stage">
+      <div class="choices" id="lex-choices"></div>
+      <div class="feedback" id="lex-feedback"></div>
+    </div>
+
+    <div class="row">
+      <button class="btn secondary" id="lex-reset">Iš naujo</button>
+    </div>
+
+    <div class="meta">
+      <span>Rezultatas: <strong id="lex-score">0 / 0</strong></span>
+      <span id="lex-progress-text">0 / 0</span>
+    </div>
+    <div class="progress"><div id="lex-progress"></div></div>
+  </section>
+</div>
+
+<script>
+// ---------- STIMULI ----------
+const rapidWords = ["namas", "vanduo", "miestas", "knyga", "diena", "mokykla", "draugas", "saulė", "medis", "kelias", "mokytoja", "sąsiuvinis", "vakaras", "pradžia", "žmogus"];
+
+const pickPairs = [["kęsti","kęsdi"], ["draugas","drauks"], ["viršūnė","viršiūnė"], ["liaudis","laudis"], ["klasė","klassė"], ["biuras","buiras"], ["ekonomika","ekonimika"], ["pradžia","pradzia"], ["medžiai","medziai"], ["šiandien","šandien"], ["vienuolika","vienolika"], ["aštuoni","aštoni"], ["rūšis","rušis"], ["įsakymas","insakymas"], ["gręžti","grežti"], ["siųstuvas","siustuvas"]];
+
+const listenItems = [["ąžuolas","ąžuolas","onžuolas"], ["siųstuvas","siųstuvas","siustuvas"], ["draugas","draugas","draukas"], ["medžiai","medžiai","medžei"], ["liaudis","liaudis","leudis"], ["klasė","klasė","klassė"], ["pradžia","pradžia","pradja"], ["viršūnė","viršūnė","viršunė"], ["šiandien","šiandien","šandien"], ["ekonomika","ekonomika","ekanomika"]];
+
+const dictationWords = ["mokykla", "draugas", "vanduo", "knyga", "ąžuolas", "širdis", "saulė", "kalbėti", "sąrašas", "vakaras"];
+
+const lexicalPairs = [["mokytojas","mokylojas"], ["knygynas","knygylas"], ["draugystė","draugintė"], ["vakarienė","vakaratė"], ["gražuolė","gražinė"], ["mokslininkas","mokslinykas"], ["mėnesinė","mėnesotė"], ["kalbėtojas","kalbinykas"], ["valstybė","valstynė"], ["pavasaris","pavasaras"]];
+
+// ---------- HELPERS ----------
+const $ = id => document.getElementById(id);
+const shuffle = arr => {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+const norm = s => (s || "").trim().toLowerCase();
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'lt-LT';
+    u.rate = 0.85;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+// ---------- TAB NAV ----------
+document.querySelectorAll('#tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    ['rapid','pick','listen','dictation','lexical'].forEach(t => {
+      $('task-' + t).hidden = (t !== tab);
+    });
+  });
+});
+
+// ---------- TASK 1: RAPID READING ----------
+(function() {
+  let order = shuffle(rapidWords);
+  let idx = 0, correct = 0, total = 0;
+  let running = false;
+
+  const stim = $('rapid-stim');
+  const input = $('rapid-input');
+  const fb = $('rapid-feedback');
+  const startBtn = $('rapid-start');
+  const resetBtn = $('rapid-reset');
+  const msSlider = $('rapid-ms');
+  const msVal = $('rapid-ms-val');
+  const score = $('rapid-score');
+  const progBar = $('rapid-progress');
+  const progText = $('rapid-progress-text');
+
+  msSlider.addEventListener('input', () => {
+    msVal.textContent = msSlider.value + ' ms';
+  });
+
+  function updateMeta() {
+    score.textContent = correct + ' / ' + total;
+    progText.textContent = idx + ' / ' + order.length;
+    progBar.style.width = (order.length ? (idx / order.length * 100) : 0) + '%';
+  }
+
+  function showWord() {
+    if (idx >= order.length) {
+      stim.textContent = '✓ Baigta';
+      fb.textContent = 'Galutinis rezultatas: ' + correct + ' / ' + total;
+      fb.className = 'feedback correct';
+      input.hidden = true;
+      startBtn.disabled = false;
+      startBtn.textContent = 'Pradėti iš naujo';
+      running = false;
+      return;
+    }
+    const word = order[idx];
+    fb.textContent = '';
+    fb.className = 'feedback';
+    input.hidden = true;
+    input.value = '';
+    stim.textContent = word;
+    const ms = parseInt(msSlider.value, 10);
+    setTimeout(() => {
+      stim.textContent = '•••';
+      input.hidden = false;
+      input.focus();
+    }, ms);
+  }
+
+  function submit() {
+    if (input.hidden) return;
+    const guess = norm(input.value);
+    const target = norm(order[idx]);
+    total++;
+    if (guess === target) {
+      correct++;
+      fb.textContent = '✓ Teisingai!';
+      fb.className = 'feedback correct';
+    } else {
+      fb.textContent = '✗ Buvo: ' + order[idx];
+      fb.className = 'feedback wrong';
+    }
+    idx++;
+    updateMeta();
+    input.hidden = true;
+    setTimeout(showWord, 900);
+  }
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  startBtn.addEventListener('click', () => {
+    if (running) return;
+    if (idx >= order.length) {
+      order = shuffle(rapidWords);
+      idx = 0; correct = 0; total = 0;
+    }
+    running = true;
+    startBtn.disabled = true;
+    startBtn.textContent = 'Vyksta...';
+    updateMeta();
+    showWord();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    order = shuffle(rapidWords);
+    idx = 0; correct = 0; total = 0;
+    running = false;
+    stim.textContent = '—';
+    input.hidden = true;
+    input.value = '';
+    fb.textContent = '';
+    fb.className = 'feedback';
+    startBtn.disabled = false;
+    startBtn.textContent = 'Pradėti';
+    updateMeta();
+  });
+
+  updateMeta();
+})();
+
+// ---------- TASK 2: PICK CORRECT ----------
+(function() {
+  let order = shuffle(pickPairs);
+  let idx = 0, correct = 0, total = 0;
+  const choicesEl = $('pick-choices');
+  const fb = $('pick-feedback');
+  const resetBtn = $('pick-reset');
+  const score = $('pick-score');
+  const progBar = $('pick-progress');
+  const progText = $('pick-progress-text');
+
+  function updateMeta() {
+    score.textContent = correct + ' / ' + total;
+    progText.textContent = idx + ' / ' + order.length;
+    progBar.style.width = (order.length ? (idx / order.length * 100) : 0) + '%';
+  }
+
+  function render() {
+    if (idx >= order.length) {
+      choicesEl.innerHTML = '';
+      fb.innerHTML = '<span>✓ Baigta. Galutinis: <strong>' + correct + ' / ' + total + '</strong></span>';
+      fb.className = 'feedback correct';
+      return;
+    }
+    fb.textContent = '';
+    fb.className = 'feedback';
+    const [right, wrong] = order[idx];
+    const arrangement = Math.random() < 0.5 ? [right, wrong] : [wrong, right];
+    choicesEl.innerHTML = '';
+    arrangement.forEach(word => {
+      const btn = document.createElement('button');
+      btn.className = 'choice';
+      btn.textContent = word;
+      btn.addEventListener('click', () => pick(btn, word, right));
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function pick(btn, word, right) {
+    Array.from(choicesEl.children).forEach(c => c.disabled = true);
+    total++;
+    if (word === right) {
+      correct++;
+      btn.classList.add('correct');
+      fb.textContent = '✓ Teisingai!';
+      fb.className = 'feedback correct';
+    } else {
+      btn.classList.add('wrong');
+      Array.from(choicesEl.children).forEach(c => {
+        if (c.textContent === right) c.classList.add('correct');
+      });
+      fb.textContent = '✗ Teisingas: ' + right;
+      fb.className = 'feedback wrong';
+    }
+    idx++;
+    updateMeta();
+    setTimeout(render, 1100);
+  }
+
+  resetBtn.addEventListener('click', () => {
+    order = shuffle(pickPairs);
+    idx = 0; correct = 0; total = 0;
+    updateMeta();
+    render();
+  });
+
+  updateMeta();
+  render();
+})();
+
+// ---------- TASK 3: LISTEN AND CHOOSE ----------
+(function() {
+  let order = shuffle(listenItems);
+  let idx = 0, correct = 0, total = 0;
+  const choicesEl = $('listen-choices');
+  const fb = $('listen-feedback');
+  const playBtn = $('listen-play');
+  const resetBtn = $('listen-reset');
+  const score = $('listen-score');
+  const progBar = $('listen-progress');
+  const progText = $('listen-progress-text');
+
+  function updateMeta() {
+    score.textContent = correct + ' / ' + total;
+    progText.textContent = idx + ' / ' + order.length;
+    progBar.style.width = (order.length ? (idx / order.length * 100) : 0) + '%';
+  }
+
+  function render() {
+    if (idx >= order.length) {
+      choicesEl.innerHTML = '';
+      playBtn.disabled = true;
+      fb.innerHTML = '<span>✓ Baigta. Galutinis: <strong>' + correct + ' / ' + total + '</strong></span>';
+      fb.className = 'feedback correct';
+      return;
+    }
+    fb.textContent = '';
+    fb.className = 'feedback';
+    playBtn.disabled = false;
+    const [, right, wrong] = order[idx];
+    const arrangement = Math.random() < 0.5 ? [right, wrong] : [wrong, right];
+    choicesEl.innerHTML = '';
+    arrangement.forEach(word => {
+      const btn = document.createElement('button');
+      btn.className = 'choice';
+      btn.textContent = word;
+      btn.addEventListener('click', () => pick(btn, word, right));
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function pick(btn, word, right) {
+    Array.from(choicesEl.children).forEach(c => c.disabled = true);
+    total++;
+    if (word === right) {
+      correct++;
+      btn.classList.add('correct');
+      fb.textContent = '✓ Teisingai!';
+      fb.className = 'feedback correct';
+    } else {
+      btn.classList.add('wrong');
+      Array.from(choicesEl.children).forEach(c => {
+        if (c.textContent === right) c.classList.add('correct');
+      });
+      fb.textContent = '✗ Teisingas: ' + right;
+      fb.className = 'feedback wrong';
+    }
+    idx++;
+    updateMeta();
+    setTimeout(render, 1100);
+  }
+
+  playBtn.addEventListener('click', () => {
+    if (idx >= order.length) return;
+    speak(order[idx][0]);
+  });
+
+  resetBtn.addEventListener('click', () => {
+    order = shuffle(listenItems);
+    idx = 0; correct = 0; total = 0;
+    updateMeta();
+    render();
+  });
+
+  updateMeta();
+  render();
+})();
+
+// ---------- TASK 4: DICTATION ----------
+(function() {
+  let order = shuffle(dictationWords);
+  let idx = 0, correct = 0, total = 0;
+  const replayBtn = $('dict-replay');
+  const input = $('dict-input');
+  const fb = $('dict-feedback');
+  const resetBtn = $('dict-reset');
+  const score = $('dict-score');
+  const progBar = $('dict-progress');
+  const progText = $('dict-progress-text');
+
+  function updateMeta() {
+    score.textContent = correct + ' / ' + total;
+    progText.textContent = idx + ' / ' + order.length;
+    progBar.style.width = (order.length ? (idx / order.length * 100) : 0) + '%';
+  }
+
+  function next() {
+    if (idx >= order.length) {
+      input.disabled = true;
+      replayBtn.disabled = true;
+      fb.innerHTML = '<span>✓ Baigta. Galutinis: <strong>' + correct + ' / ' + total + '</strong></span>';
+      fb.className = 'feedback correct';
+      return;
+    }
+    input.disabled = false;
+    replayBtn.disabled = false;
+    input.value = '';
+    fb.textContent = '';
+    fb.className = 'feedback';
+    setTimeout(() => {
+      speak(order[idx]);
+      input.focus();
+    }, 250);
+  }
+
+  function submit() {
+    if (idx >= order.length || input.disabled) return;
+    const guess = norm(input.value);
+    if (!guess) return;
+    const target = norm(order[idx]);
+    total++;
+    if (guess === target) {
+      correct++;
+      fb.textContent = '✓ Teisingai!';
+      fb.className = 'feedback correct';
+    } else {
+      fb.textContent = '✗ Buvo: ' + order[idx];
+      fb.className = 'feedback wrong';
+    }
+    idx++;
+    updateMeta();
+    setTimeout(next, 1100);
+  }
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  replayBtn.addEventListener('click', () => {
+    if (idx >= order.length) return;
+    speak(order[idx]);
+    input.focus();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    order = shuffle(dictationWords);
+    idx = 0; correct = 0; total = 0;
+    updateMeta();
+    next();
+  });
+
+  updateMeta();
+  next();
+})();
+
+// ---------- TASK 5: LEXICAL DECISION ----------
+(function() {
+  let order = shuffle(lexicalPairs);
+  let idx = 0, correct = 0, total = 0;
+  const choicesEl = $('lex-choices');
+  const fb = $('lex-feedback');
+  const resetBtn = $('lex-reset');
+  const score = $('lex-score');
+  const progBar = $('lex-progress');
+  const progText = $('lex-progress-text');
+
+  function updateMeta() {
+    score.textContent = correct + ' / ' + total;
+    progText.textContent = idx + ' / ' + order.length;
+    progBar.style.width = (order.length ? (idx / order.length * 100) : 0) + '%';
+  }
+
+  function render() {
+    if (idx >= order.length) {
+      choicesEl.innerHTML = '';
+      fb.innerHTML = '<span>✓ Baigta. Galutinis: <strong>' + correct + ' / ' + total + '</strong></span>';
+      fb.className = 'feedback correct';
+      return;
+    }
+    fb.textContent = '';
+    fb.className = 'feedback';
+    const [real, fake] = order[idx];
+    const arrangement = Math.random() < 0.5 ? [real, fake] : [fake, real];
+    choicesEl.innerHTML = '';
+    arrangement.forEach(word => {
+      const btn = document.createElement('button');
+      btn.className = 'choice';
+      btn.textContent = word;
+      btn.addEventListener('click', () => pick(btn, word, real));
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function pick(btn, word, real) {
+    Array.from(choicesEl.children).forEach(c => c.disabled = true);
+    total++;
+    if (word === real) {
+      correct++;
+      btn.classList.add('correct');
+      fb.textContent = '✓ Teisingai!';
+      fb.className = 'feedback correct';
+    } else {
+      btn.classList.add('wrong');
+      Array.from(choicesEl.children).forEach(c => {
+        if (c.textContent === real) c.classList.add('correct');
+      });
+      fb.textContent = '✗ Tikras žodis: ' + real;
+      fb.className = 'feedback wrong';
+    }
+    idx++;
+    updateMeta();
+    setTimeout(render, 1100);
+  }
+
+  resetBtn.addEventListener('click', () => {
+    order = shuffle(lexicalPairs);
+    idx = 0; correct = 0; total = 0;
+    updateMeta();
+    render();
+  });
+
+  updateMeta();
+  render();
+})();
+</script>
+</body>
+</html>
