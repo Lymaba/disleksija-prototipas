@@ -467,14 +467,27 @@ const shuffle = arr => {
 const norm = s => (s || "").trim().toLowerCase();
 
 function speak(text) {
-  if (!('speechSynthesis' in window)) return;
+  function fallback() {
+    if (!('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'lt-LT';
+      u.rate = 0.85;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
   try {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'lt-LT';
-    u.rate = 0.85;
-    window.speechSynthesis.speak(u);
-  } catch (e) {}
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    const audio = new Audio('audio/' + encodeURIComponent(text) + '.aac');
+    audio.addEventListener('error', fallback, { once: true });
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(fallback);
+    }
+  } catch (e) {
+    fallback();
+  }
 }
 
 // ---------- TAB NAV ----------
