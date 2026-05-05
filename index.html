@@ -227,6 +227,16 @@
     transition: width 0.25s;
   }
   .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .morph-prompt {
+    font-size: 19px;
+    line-height: 1.5;
+    text-align: left;
+    max-width: 560px;
+    margin: 0 auto;
+    color: var(--text);
+  }
+  .choices.morph { gap: 12px; }
+  .choices.morph .choice { min-width: 140px; padding: 12px 18px; font-size: 20px; }
   .done {
     text-align: center;
     color: var(--muted);
@@ -248,6 +258,7 @@
     <button data-tab="listen">3. Klausyk ir pasirink</button>
     <button data-tab="dictation">4. Diktantas</button>
     <button data-tab="lexical">5. Leksinis sprendimas</button>
+    <button data-tab="morph">6. Morfologinė užduotis</button>
   </nav>
 
   <!-- TASK 1: RAPID READING -->
@@ -364,6 +375,28 @@
     </div>
     <div class="progress"><div id="lex-progress"></div></div>
   </section>
+
+  <!-- TASK 6: MORPHOLOGICAL -->
+  <section class="task" id="task-morph" hidden>
+    <h2>Morfologinė užduotis</h2>
+    <p class="desc">Pasirink teisingai sudarytą žodį pagal sakinio prasmę.</p>
+
+    <div class="stage">
+      <div class="morph-prompt" id="morph-prompt"></div>
+      <div class="choices morph" id="morph-choices"></div>
+      <div class="feedback" id="morph-feedback"></div>
+    </div>
+
+    <div class="row">
+      <button class="btn secondary" id="morph-reset">Iš naujo</button>
+    </div>
+
+    <div class="meta">
+      <span>Rezultatas: <strong id="morph-score">0 / 0</strong></span>
+      <span id="morph-progress-text">0 / 0</span>
+    </div>
+    <div class="progress"><div id="morph-progress"></div></div>
+  </section>
 </div>
 
 <script>
@@ -377,6 +410,49 @@ const listenItems = [["ąžuolas","ąžuolas","onžuolas"], ["siųstuvas","siųs
 const dictationWords = ["mokykla", "draugas", "vanduo", "knyga", "ąžuolas", "širdis", "saulė", "kalbėti", "sąrašas", "vakaras"];
 
 const lexicalPairs = [["mokytojas","mokylojas"], ["knygynas","knygylas"], ["draugystė","draugintė"], ["vakarienė","vakaratė"], ["gražuolė","gražinė"], ["mokslininkas","mokslinykas"], ["mėnesinė","mėnesotė"], ["kalbėtojas","kalbinykas"], ["valstybė","valstynė"], ["pavasaris","pavasaras"]];
+
+const morphItems = [
+  {
+    prompt: "Plimti — tai veiksmas. Kaip pavadintume žmogų, kuris plimia?",
+    correct: "plimtojas",
+    foils: ["plimynas", "plimtinė"]
+  },
+  {
+    prompt: "Jeigu kreita — tai augalas, kaip vadintųsi vieta, kur auga daug kreitų?",
+    correct: "kreitynas",
+    foils: ["kreitėjas", "kreitukas"]
+  },
+  {
+    prompt: "Žvirpas yra didelis. Kaip vadintume mažą žvirpą?",
+    correct: "žvirpukas",
+    foils: ["žvirpynas", "žvirpystė"]
+  },
+  {
+    prompt: "Drėsti — tai veiksmas. Kaip pavadintume patį šio veiksmo procesą?",
+    correct: "drėtimas",
+    foils: ["drėtuvas", "drėtystė"]
+  },
+  {
+    prompt: "Jeigu žmogus yra šturas, kaip pavadintume šią savybę?",
+    correct: "šturystė",
+    foils: ["šturynas", "šturėjas"]
+  },
+  {
+    prompt: "Jeigu klemas — tai medžiaga, kaip pavadintume daiktą, padarytą iš klemo?",
+    correct: "kleminis",
+    foils: ["klemėjas", "klemynas"]
+  },
+  {
+    prompt: "Brėnti — tai veiksmas. Kaip pavadintume įrankį, su kuriuo galima brėnti?",
+    correct: "brėntuvas",
+    foils: ["brėntojas", "brėntimas"]
+  },
+  {
+    prompt: "Vrenkti — tai veiksmas. Kaip pavadintume moterį, kuri vrenkia?",
+    correct: "vrenktoja",
+    foils: ["vrenktinė", "vrenktoji"]
+  }
+];
 
 // ---------- HELPERS ----------
 const $ = id => document.getElementById(id);
@@ -407,7 +483,7 @@ document.querySelectorAll('#tabs button').forEach(btn => {
     document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const tab = btn.dataset.tab;
-    ['rapid','pick','listen','dictation','lexical'].forEach(t => {
+    ['rapid','pick','listen','dictation','lexical','morph'].forEach(t => {
       $('task-' + t).hidden = (t !== tab);
     });
   });
@@ -810,6 +886,79 @@ document.querySelectorAll('#tabs button').forEach(btn => {
 
   resetBtn.addEventListener('click', () => {
     order = shuffle(lexicalPairs);
+    idx = 0; correct = 0; total = 0;
+    updateMeta();
+    render();
+  });
+
+  updateMeta();
+  render();
+})();
+
+// ---------- TASK 6: MORPHOLOGICAL ----------
+(function() {
+  let order = shuffle(morphItems);
+  let idx = 0, correct = 0, total = 0;
+  const promptEl = $('morph-prompt');
+  const choicesEl = $('morph-choices');
+  const fb = $('morph-feedback');
+  const resetBtn = $('morph-reset');
+  const score = $('morph-score');
+  const progBar = $('morph-progress');
+  const progText = $('morph-progress-text');
+
+  function updateMeta() {
+    score.textContent = correct + ' / ' + total;
+    progText.textContent = idx + ' / ' + order.length;
+    progBar.style.width = (order.length ? (idx / order.length * 100) : 0) + '%';
+  }
+
+  function render() {
+    if (idx >= order.length) {
+      promptEl.textContent = '';
+      choicesEl.innerHTML = '';
+      fb.innerHTML = '<span>✓ Baigta. Galutinis: <strong>' + correct + ' / ' + total + '</strong></span>';
+      fb.className = 'feedback correct';
+      return;
+    }
+    fb.textContent = '';
+    fb.className = 'feedback';
+    const item = order[idx];
+    promptEl.textContent = item.prompt;
+    const arrangement = shuffle([item.correct, ...item.foils]);
+    choicesEl.innerHTML = '';
+    arrangement.forEach(word => {
+      const btn = document.createElement('button');
+      btn.className = 'choice';
+      btn.textContent = word;
+      btn.addEventListener('click', () => pick(btn, word, item.correct));
+      choicesEl.appendChild(btn);
+    });
+  }
+
+  function pick(btn, word, right) {
+    Array.from(choicesEl.children).forEach(c => c.disabled = true);
+    total++;
+    if (word === right) {
+      correct++;
+      btn.classList.add('correct');
+      fb.textContent = '✓ Teisingai!';
+      fb.className = 'feedback correct';
+    } else {
+      btn.classList.add('wrong');
+      Array.from(choicesEl.children).forEach(c => {
+        if (c.textContent === right) c.classList.add('correct');
+      });
+      fb.textContent = '✗ Teisingas: ' + right;
+      fb.className = 'feedback wrong';
+    }
+    idx++;
+    updateMeta();
+    setTimeout(render, 1500);
+  }
+
+  resetBtn.addEventListener('click', () => {
+    order = shuffle(morphItems);
     idx = 0; correct = 0; total = 0;
     updateMeta();
     render();
